@@ -1,5 +1,5 @@
 from urllib.parse import urlencode
-from datetime import datetime
+from datetime import datetime, timezone
 from json.decoder import JSONDecodeError
 import logging
 import requests
@@ -10,6 +10,10 @@ def _append_to_query_string(query, extra_params):
     if not query:
         return extra_params
     return f'{query}&{extra_params}'
+
+
+def _utc_timestamp():
+    return datetime.now(tz=timezone.utc).timestamp()
 
 
 class RestError(Exception):
@@ -39,7 +43,7 @@ class RestSession:
         post_string = urlencode(post or {})
 
         if signed:
-            timestamp = int(datetime.utcnow().timestamp() * 1000)
+            timestamp = int(_utc_timestamp() * 1000)
             query_string = _append_to_query_string(query_string, f'timestamp={timestamp}')
 
             signature = auth_utils.generate_signature(self.api_secret, query_string, post_string)
