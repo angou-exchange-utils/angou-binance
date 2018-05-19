@@ -2,14 +2,26 @@ from urllib.parse import urlencode
 from datetime import datetime, timezone
 from json.decoder import JSONDecodeError
 import logging
+import hmac
+import hashlib
 import requests
-from . import auth_utils
 
 
 def _append_to_query_string(query, extra_params):
     if not query:
         return extra_params
     return f'{query}&{extra_params}'
+
+
+def _generate_signature(secret, query, body):
+    if isinstance(body, (bytes, bytearray)):
+        body = body.decode('utf8')
+    message = query + body
+    signature = hmac.new(
+        bytes(secret, 'utf8'),
+        bytes(message, 'utf8'),
+        digestmod=hashlib.sha256)
+    return signature.hexdigest()
 
 
 def _utc_timestamp():
@@ -46,7 +58,7 @@ class RestSession:
             timestamp = int(_utc_timestamp() * 1000)
             query_string = _append_to_query_string(query_string, f'timestamp={timestamp}')
 
-            signature = auth_utils.generate_signature(self.api_secret, query_string, post_string)
+            signature = _generate_signature(self.api_secret, query_string, post_string)
             signature_string = f'signature={signature}'
             if post is None:
                 query_string = _append_to_query_string(query_string, signature_string)
