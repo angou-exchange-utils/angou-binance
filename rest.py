@@ -3,7 +3,7 @@ from datetime import datetime
 from json.decoder import JSONDecodeError
 import logging
 import requests
-import auth_utils
+from . import auth_utils
 
 
 def _append_to_query_string(query, extra_params):
