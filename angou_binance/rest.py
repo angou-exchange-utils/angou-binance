@@ -1,10 +1,12 @@
 from urllib.parse import urlencode
 from datetime import datetime, timezone
-from json.decoder import JSONDecodeError
 import logging
 import hmac
 import hashlib
 import requests
+
+
+LOGGER = logging.getLogger('angou_binance')
 
 
 def _append_to_query_string(query, extra_params):
@@ -28,6 +30,10 @@ def _utc_timestamp():
     return datetime.now(tz=timezone.utc).timestamp()
 
 
+class InvalidJSON(Exception):
+    pass
+
+
 class RestError(Exception):
     def __init__(self, code, message):
         super().__init__(f'[{code}] {message}')
@@ -36,9 +42,10 @@ class RestError(Exception):
 
 
 class RestSession:
-    def __init__(self, api_key, api_secret):
+    def __init__(self, api_key, api_secret, request_kwargs=None):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.request_kwargs = request_kwargs or {}
         self._session = requests.Session()
         self._session.headers.update({
             'User-Agent': 'angou-binance-yo',
@@ -46,11 +53,8 @@ class RestSession:
             'Accept': 'application/json',
             'X-MBX-APIKEY': api_key,
         })
-        self.logger = logging.getLogger('angou_binance')
 
-    def request(self, verb, path, signed=False, query=None, post=None):
-        self.logger.debug('%s %s signed=%s query=%s post=%s', verb, path, signed, query, post)
-
+    def _get_query_and_body(self, signed=False, query=None, post=None):
         query_string = urlencode(query or {})
         post_string = urlencode(post or {})
 
@@ -65,21 +69,29 @@ class RestSession:
             else:
                 post_string = _append_to_query_string(post_string, signature_string)
 
-        url = f'https://api.binance.com{path}?{query_string}'
+        return query_string, post_string
 
-        req = requests.Request(verb, url, data=post_string or None)
-        prepared_req = self._session.prepare_request(req)
-        resp = self._session.send(prepared_req)
+    def request(self, verb, path, signed=False, query=None, post=None):
+        LOGGER.debug('%s %s signed=%s query=%s post=%s', verb, path, signed, query, post)
+        query, body = self._get_query_and_body(signed, query, post)
+        url = f'https://api.binance.com{path}?{query}'
+        resp = self._session.request(verb, url, data=body or None, **self.request_kwargs)
 
         try:
             resp.raise_for_status()
-        except requests.exceptions.HTTPError as ex:
-            if resp is not None and 400 <= resp.status_code < 600:
+        except requests.exceptions.HTTPError:
+            try:
+                err_obj = resp.json()
+            except ValueError:
+                pass
+            else:
                 try:
-                    err_obj = resp.json()
                     raise RestError(code=err_obj['code'], message=err_obj['msg'])
-                except (JSONDecodeError, KeyError):
+                except KeyError:
                     pass
-            raise ex
+            raise
         else:
-            return resp.json()
+            try:
+                return resp.json()
+            except ValueError:
+                raise InvalidJSON()
