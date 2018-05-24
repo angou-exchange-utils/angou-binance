@@ -49,7 +49,7 @@ class RestSession:
         self._session = requests.Session()
         self._session.headers.update({
             'User-Agent': 'angou-binance-yo',
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
             'Accept': 'application/json',
             'X-MBX-APIKEY': api_key,
         })
