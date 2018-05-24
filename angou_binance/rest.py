@@ -42,10 +42,10 @@ class RestError(Exception):
 
 
 class RestSession:
-    def __init__(self, api_key, api_secret, request_kwargs=None):
+    def __init__(self, api_key, api_secret, timeout=None):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.request_kwargs = request_kwargs or {}
+        self.timeout = timeout
         self._session = requests.Session()
         self._session.headers.update({
             'User-Agent': 'angou-binance-yo',
@@ -75,7 +75,7 @@ class RestSession:
         LOGGER.debug('%s %s signed=%s query=%s post=%s', verb, path, signed, query, post)
         query, body = self._get_query_and_body(signed, query, post)
         url = f'https://api.binance.com{path}?{query}'
-        resp = self._session.request(verb, url, data=body or None, **self.request_kwargs)
+        resp = self._session.request(verb, url, data=body or None, timeout=self.timeout)
 
         try:
             resp.raise_for_status()
