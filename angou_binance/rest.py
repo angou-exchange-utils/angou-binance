@@ -6,7 +6,7 @@ import hashlib
 import requests
 
 
-LOGGER = logging.getLogger('angou_binance')
+LOGGER = logging.getLogger(__name__)
 
 
 def _append_to_query_string(query, extra_params):
